@@ -1,0 +1,31 @@
+{
+  "devDependencies": {
+    "@4tw/cypress-drag-drop": "^2.2.4",
+    "cypress": "^12.17.3"
+  },
+  "dependencies": {
+    "@babel/core": "^7.24.5",
+    "@babel/preset-env": "^7.24.5",
+    "@babel/preset-react": "^7.24.1",
+    "body-parser": "^2.2.0",
+    "chai-colors": "^1.0.1",
+    "cypress-real-events": "^1.10.0",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "request": "^2.88.2"
+  },
+  "name": "sherry",
+  "version": "1.0.0",
+  "main": "cypress.config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node server.js"
+},
+
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
