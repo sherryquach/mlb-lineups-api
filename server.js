@@ -1,6 +1,15 @@
+const express = require('express');
+const bodyParser = require('body-parser');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const jwt = require('jsonwebtoken');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const SECRET = process.env.JWT_SECRET || 'secret123';
+
+app.use(bodyParser.json());
+
 
 app.get('/api/lineupsFromTestPage', async (req, res) => {
   const token = req.headers['x-access-token'];
@@ -48,4 +57,8 @@ app.get('/api/lineupsFromTestPage', async (req, res) => {
     console.error('Scraper error:', err.message);
     res.status(500).json({ error: 'Scraping failed or token invalid' });
   }
+});
+
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
 });
