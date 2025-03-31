@@ -10,48 +10,68 @@ const SECRET = process.env.JWT_SECRET || 'secret123';
 
 app.use(bodyParser.json());
 
+// ✅ Authentication route
+app.post('/api/authenticate', (req, res) => {
+  const { name, password } = req.body;
+  if (name === 'Admin' && password === 'qwerty1') {
+    const token = jwt.sign({ name }, SECRET, { expiresIn: '1h' });
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ success: false, message: 'Authentication failed' });
+  }
+});
 
+// ✅ Scraper route
 app.get('/api/lineupsFromTestPage', async (req, res) => {
   const token = req.headers['x-access-token'];
-  const SECRET = process.env.JWT_SECRET || 'secret123';
-
   if (!token) return res.status(403).json({ message: 'No token provided' });
 
   try {
     jwt.verify(token, SECRET);
 
-    const { data } = await axios.get('https://www.rotowire.com/baseball/daily_lineups.htm');
-    const $ = cheerio.load(data);
-
-    const games = [];
-
-    $('.lineup__matchup').each((i, el) => {
-      const time = $(el).find('.lineup__time').text().trim();
-
-      const awayTeam = $(el).find('.lineup__team--away .lineup__abbr').text().trim();
-      const awayLineup = [];
-      $(el).find('.lineup__team--away ul.lineup__list li').each((j, playerEl) => {
-        const player = $(playerEl).find('.lineup__player-name').text().trim();
-        const position = $(playerEl).find('.lineup__pos').text().trim();
-        awayLineup.push({ player, position });
-      });
-
-      const homeTeam = $(el).find('.lineup__team--home .lineup__abbr').text().trim();
-      const homeLineup = [];
-      $(el).find('.lineup__team--home ul.lineup__list li').each((j, playerEl) => {
-        const player = $(playerEl).find('.lineup__player-name').text().trim();
-        const position = $(playerEl).find('.lineup__pos').text().trim();
-        homeLineup.push({ player, position });
-      });
-
-      games.push({
-        time,
-        away: { name: awayTeam, lineup: awayLineup },
-        home: { name: homeTeam, lineup: homeLineup }
-      });
+    const { data } = await axios.get('https://www.rotowire.com/baseball/daily_lineups.htm', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
     });
 
-    res.json({ games });
+    const $ = cheerio.load(data);
+    const games = [];
+
+    $('.lineup.is-mlb').each((i, el) => {
+      const time = $(el).find('.lineup__time').text().trim();
+      const awayTeam = $(el).find('.lineup__team.is-visit .lineup__abbr').text().trim();
+      const homeTeam = $(el).find('.lineup__team.is-home .lineup__abbr').text().trim();
+
+      const awayLineup = [];
+      $(el).find('.lineup__list.is-visit li.lineup__player').each((j, playerEl) => {
+        const player = $(playerEl).find('a').attr('title')?.trim();
+        const position = $(playerEl).find('.lineup__pos').text().trim();
+        const bats = $(playerEl).find('.lineup__bats').text().trim();
+        if (player && position) awayLineup.push({ player, position, bats });
+      });
+
+      const homeLineup = [];
+      $(el).find('.lineup__list.is-home li.lineup__player').each((j, playerEl) => {
+        const player = $(playerEl).find('a').attr('title')?.trim();
+        const position = $(playerEl).find('.lineup__pos').text().trim();
+        const bats = $(playerEl).find('.lineup__bats').text().trim();
+        if (player && position) homeLineup.push({ player, position, bats });
+      });
+
+      // Skip garbage entries
+      if (time.includes('ET') && awayTeam && homeTeam) {
+        games.push({
+          time,
+          away: { name: awayTeam, lineup: awayLineup },
+          home: { name: homeTeam, lineup: homeLineup }
+        });
+      }
+    });
+
+    res.json(games);
 
   } catch (err) {
     console.error('Scraper error:', err.message);
@@ -59,6 +79,7 @@ app.get('/api/lineupsFromTestPage', async (req, res) => {
   }
 });
 
+// ✅ Start the server
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
