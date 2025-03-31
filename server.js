@@ -24,6 +24,7 @@ app.post('/api/authenticate', (req, res) => {
 // ✅ Scraper route
 app.get('/api/lineupsFromTestPage', async (req, res) => {
   const token = req.headers['x-access-token'];
+
   if (!token) return res.status(403).json({ message: 'No token provided' });
 
   try {
@@ -33,7 +34,7 @@ app.get('/api/lineupsFromTestPage', async (req, res) => {
       headers: {
         'User-Agent': 'Mozilla/5.0',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        'Accept': 'text/html'
       }
     });
 
@@ -45,34 +46,44 @@ app.get('/api/lineupsFromTestPage', async (req, res) => {
       const awayTeam = $(el).find('.lineup__team.is-visit .lineup__abbr').text().trim();
       const homeTeam = $(el).find('.lineup__team.is-home .lineup__abbr').text().trim();
 
-      const awayLineup = [];
-      $(el).find('.lineup__list.is-visit li.lineup__player').each((j, playerEl) => {
-        const player = $(playerEl).find('a').attr('title')?.trim();
-        const position = $(playerEl).find('.lineup__pos').text().trim();
-        const bats = $(playerEl).find('.lineup__bats').text().trim();
-        if (player && position) awayLineup.push({ player, position, bats });
-      });
+      const extractPitcherInfo = (selector) => {
+        const name = $(el).find(`${selector} li.lineup__player-highlight a`).first().text().trim();
+        const throws = $(el).find(`${selector} li.lineup__player-highlight .lineup__throws`).first().text().trim();
+        const status = $(el).find(`${selector} li.lineup__status`).first().text().trim();
+        return { name, throws, status };
+      };
 
-      const homeLineup = [];
-      $(el).find('.lineup__list.is-home li.lineup__player').each((j, playerEl) => {
-        const player = $(playerEl).find('a').attr('title')?.trim();
-        const position = $(playerEl).find('.lineup__pos').text().trim();
-        const bats = $(playerEl).find('.lineup__bats').text().trim();
-        if (player && position) homeLineup.push({ player, position, bats });
-      });
+      const extractLineup = (selector) => {
+        const lineup = [];
+        $(el).find(`${selector} li.lineup__player`).each((j, playerEl) => {
+          const player = $(playerEl).find('a').attr('title')?.trim();
+          const position = $(playerEl).find('.lineup__pos').text().trim();
+          const bats = $(playerEl).find('.lineup__bats').text().trim();
+          if (player && position) {
+            lineup.push({ player, position, bats });
+          }
+        });
+        return lineup;
+      };
 
-      // Skip garbage entries
-      if (time.includes('ET') && awayTeam && homeTeam) {
+      if (time && awayTeam && homeTeam) {
         games.push({
           time,
-          away: { name: awayTeam, lineup: awayLineup },
-          home: { name: homeTeam, lineup: homeLineup }
+          away: {
+            name: awayTeam,
+            pitcher: extractPitcherInfo('.lineup__list.is-visit'),
+            lineup: extractLineup('.lineup__list.is-visit')
+          },
+          home: {
+            name: homeTeam,
+            pitcher: extractPitcherInfo('.lineup__list.is-home'),
+            lineup: extractLineup('.lineup__list.is-home')
+          }
         });
       }
     });
 
     res.json(games);
-
   } catch (err) {
     console.error('Scraper error:', err.message);
     res.status(500).json({ error: 'Scraping failed or token invalid' });
